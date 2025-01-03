@@ -1,13 +1,17 @@
 ﻿using bloomteq.Models;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using System.Reflection.Emit;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 namespace bloomteq
 {
-    public class ApplicationDbContext : IdentityDbContext<User>
+    public interface IApplicationDbContext
+    {
+        DbSet<Shift> Shifts { get; set; }
+        DbSet<User> Users { get; set; }
+        int SaveChanges();
+        void Remove<T>(T entity) where T : class;
+
+    }
+    public class ApplicationDbContext : IdentityDbContext<User> , IApplicationDbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -16,7 +20,10 @@ namespace bloomteq
         public DbSet<User> Users { get; set; }
         public DbSet<Shift> Shifts { get; set; }
 
-
+        public void Remove<T>(T entity) where T : class
+        {
+            Set<T>().Remove(entity);
+        }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseSqlServer("Server =(localdb)\\mssqllocaldb;Database=BLOOMTEQ;Trusted_Connection=True;MultipleActiveResultSets=true");

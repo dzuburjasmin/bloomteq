@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
 using bloomteq;
 using bloomteq.Models;
-using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.Authorization;
 
 namespace InformationProtocolSubSystem.Api.Controllers.odata
@@ -16,10 +15,10 @@ namespace InformationProtocolSubSystem.Api.Controllers.odata
     [Authorize]
     public class ShiftsController : ODataController
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IApplicationDbContext _context;
         IHttpContextAccessor _httpContextAccessor;
 
-        public ShiftsController(ApplicationDbContext context, IHttpContextAccessor httpContextAccessor)
+        public ShiftsController(IApplicationDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;

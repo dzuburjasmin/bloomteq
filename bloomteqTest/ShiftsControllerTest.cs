@@ -13,14 +13,14 @@ namespace bloomteqTest
 {
     public class ShiftsControllerTests
     {
-        private readonly Mock<ApplicationDbContext> _mockContext;
+        private readonly Mock<IApplicationDbContext> _mockContext;
         private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor;
         private readonly ShiftsController _controller;
         private readonly Guid _testUserId = Guid.NewGuid();
 
         public ShiftsControllerTests()
         {
-            _mockContext = new Mock<ApplicationDbContext>(new DbContextOptions<ApplicationDbContext>());
+            _mockContext = new Mock<IApplicationDbContext>();
             _mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
 
             var claims = new List<Claim>

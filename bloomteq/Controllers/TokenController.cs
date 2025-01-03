@@ -10,9 +10,9 @@ public class AccountController : ControllerBase
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
     private readonly ITokenService _tokenService;
-    private readonly ApplicationDbContext _context;
+    private readonly IApplicationDbContext _context;
 
-    public AccountController(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService, ApplicationDbContext context)
+    public AccountController(UserManager<User> userManager, SignInManager<User> signInManager, ITokenService tokenService, IApplicationDbContext context)
     {
         _userManager = userManager;
         _signInManager = signInManager;
