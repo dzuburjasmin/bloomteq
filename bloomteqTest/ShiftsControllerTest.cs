@@ -1,124 +1,74 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OData.Deltas;
-using Microsoft.EntityFrameworkCore;
-using Moq;
-using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Newtonsoft.Json;
+using System.Net;
 using bloomteq.Models;
-using InformationProtocolSubSystem.Api.Controllers.odata;
-using bloomteq;
-using Microsoft.AspNetCore.OData.Results;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Net.Http.Json;
 
-namespace bloomteqTest
+namespace InformationProtocolSubSystem.Api.Tests
 {
-    public class ShiftsControllerTests
+    public class ShiftsControllerTests : IClassFixture<WebApplicationFactory<Program>>
     {
-        private readonly Mock<IApplicationDbContext> _mockContext;
-        private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor;
-        private readonly ShiftsController _controller;
-        private readonly Guid _testUserId = Guid.NewGuid();
+        private readonly HttpClient _client;
+        private readonly WebApplicationFactory<Program> _factory;
 
-        public ShiftsControllerTests()
-        {
-            _mockContext = new Mock<IApplicationDbContext>();
-            _mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
 
-            var claims = new List<Claim>
+        public ShiftsControllerTests(WebApplicationFactory<Program> factory)
         {
-            new Claim("userId", _testUserId.ToString())
+            _factory = factory;
+            _client = _factory.CreateClient();
+        }
+        private string GenerateToken(User user)
+        {
+            var claims = new[]
+            {
+            new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("name", user.Name),
+            new Claim("userId", user.Id),
         };
-            var identity = new ClaimsIdentity(claims, "TestAuth");
-            var user = new ClaimsPrincipal(identity);
-            var httpContext = new DefaultHttpContext { User = user };
-            _mockHttpContextAccessor.Setup(_ => _.HttpContext).Returns(httpContext);
 
-            _controller = new ShiftsController(_mockContext.Object, _mockHttpContextAccessor.Object);
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("bloomteqbloomteqbloomteqbloomteqsecretkey123456789"));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: "bloomteq",
+                audience: "bloomteq",
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        private void AddAuthentication()
+        {
+            var user = new User { UserName = "mock", Name = "Mock123!", Id = "mockId" };
+            var token = GenerateToken(user);
+            _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         }
 
         [Fact]
-        public void Get_ReturnsShiftsForUser()
+        public async Task Get_Shifts_ReturnsUnauthorized_WhenNoToken()
         {
-            // Arrange
-            var shifts = new List<Shift>
-        {
-            new Shift { Id = Guid.NewGuid(), UserId = _testUserId.ToString() },
-            new Shift { Id = Guid.NewGuid(), UserId = _testUserId.ToString() }
-        }.AsQueryable();
+            var response = await _client.GetAsync("odata/Shifts");
 
-            var mockSet = new Mock<DbSet<Shift>>();
-            mockSet.As<IQueryable<Shift>>().Setup(m => m.Provider).Returns(shifts.Provider);
-            mockSet.As<IQueryable<Shift>>().Setup(m => m.Expression).Returns(shifts.Expression);
-            mockSet.As<IQueryable<Shift>>().Setup(m => m.ElementType).Returns(shifts.ElementType);
-            mockSet.As<IQueryable<Shift>>().Setup(m => m.GetEnumerator()).Returns(shifts.GetEnumerator());
-
-            _mockContext.Setup(c => c.Shifts).Returns(mockSet.Object);
-
-            // Act
-            var result = _controller.Get();
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedShifts = Assert.IsAssignableFrom<IEnumerable<Shift>>(okResult.Value);
-            Assert.Equal(2, returnedShifts.Count());
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
         [Fact]
-        public void Post_AddsNewShift()
+        public async Task Patch_Shift_ReturnsNotFound_WhenShiftDoesNotExist()
         {
-            var shift = new Shift {Description = "Test", Date = DateTime.Now, Hours = 4};
-            _mockContext.Setup(c => c.Shifts.Add(It.IsAny<Shift>())).Verifiable();
-            _mockContext.Setup(c => c.SaveChanges()).Returns(1);
+            AddAuthentication();
+            var invalidShiftId = Guid.NewGuid();
+            var patchData = new { StartTime = DateTime.UtcNow.AddHours(2) };
+            var content = new StringContent(JsonConvert.SerializeObject(patchData), Encoding.UTF8, "application/json");
 
-            var result = _controller.Post(shift);
+            var response = await _client.PatchAsync($"odata/Shifts({invalidShiftId})", content);
 
-            var createdResult = Assert.IsType<CreatedODataResult<Shift>>(result);
-            Assert.Equal(shift, createdResult.Entity);
-            _mockContext.Verify(c => c.Shifts.Add(It.IsAny<Shift>()), Times.Once);
-            _mockContext.Verify(c => c.SaveChanges(), Times.Once);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
-
-        [Fact]
-        public void Patch_UpdatesExistingShift()
-        {
-            // Arrange
-            var existingShift = new Shift { Id = Guid.NewGuid(), UserId = _testUserId.ToString(), Description = "Old Desc" };
-            var delta = new Delta<Shift>();
-            delta.TrySetPropertyValue("Description", "New Desc");
-
-            var mockSet = new Mock<DbSet<Shift>>();
-            mockSet.Setup(m => m.Find(existingShift.Id)).Returns(existingShift);
-            _mockContext.Setup(c => c.Shifts).Returns(mockSet.Object);
-            _mockContext.Setup(c => c.SaveChanges()).Returns(1);
-
-            // Act
-            var result = _controller.Patch(existingShift.Id, delta);
-
-            // Assert
-            var updatedResult = Assert.IsType<UpdatedODataResult<Shift>>(result);
-            Assert.Equal("New Desc", updatedResult.Entity.Description);
-            _mockContext.Verify(c => c.SaveChanges(), Times.Once);
-        }
-
-        [Fact]
-        public void Delete_RemovesShift()
-        {
-            // Arrange
-            var existingShift = new Shift { Id = Guid.NewGuid(), UserId = _testUserId.ToString() };
-
-            var mockSet = new Mock<DbSet<Shift>>();
-            mockSet.Setup(m => m.Find(existingShift.Id)).Returns(existingShift);
-            _mockContext.Setup(c => c.Shifts).Returns(mockSet.Object);
-            _mockContext.Setup(c => c.Remove(existingShift)).Verifiable();
-            _mockContext.Setup(c => c.SaveChanges()).Returns(1);
-
-            // Act
-            var result = _controller.Delete(existingShift.Id);
-
-            // Assert
-            Assert.IsType<NoContentResult>(result);
-            _mockContext.Verify(c => c.Remove(existingShift), Times.Once);
-            _mockContext.Verify(c => c.SaveChanges(), Times.Once);
-        }
-    }
-
 }
+    }

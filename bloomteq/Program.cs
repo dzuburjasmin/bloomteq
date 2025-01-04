@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.OData;
 using Microsoft.OData.ModelBuilder;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 static Microsoft.OData.Edm.IEdmModel GetEdmModel()
@@ -23,7 +24,16 @@ builder.Services.AddControllers()
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+//if (builder.Environment.IsDevelopment())
+//{
+//    builder.Services.AddDbContext<IApplicationDbContext, ApplicationDbContext>(options =>
+//    options.UseSqlServer(builder.Configuration["ConnectionStrings:DefaultConnection"]));
+//}
+//else
+//{
+//    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+//    options.UseSqlServer(builder.Configuration["ConnectionStrings:AzureConnection"]));
+//}
 builder.Services.AddDbContext<IApplicationDbContext, ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration["ConnectionStrings:DefaultConnection"]));
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
@@ -68,3 +78,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

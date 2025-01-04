@@ -1,8 +1,10 @@
 ﻿using bloomteq.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 namespace bloomteq
 {
+
     public interface IApplicationDbContext
     {
         DbSet<Shift> Shifts { get; set; }
@@ -13,9 +15,11 @@ namespace bloomteq
     }
     public class ApplicationDbContext : IdentityDbContext<User> , IApplicationDbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        private readonly IConfiguration _configuration;
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IConfiguration configuration)
         : base(options)
         {
+            _configuration = configuration;
         }
         public DbSet<User> Users { get; set; }
         public DbSet<Shift> Shifts { get; set; }
@@ -26,7 +30,8 @@ namespace bloomteq
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer("Server =(localdb)\\mssqllocaldb;Database=BLOOMTEQ;Trusted_Connection=True;MultipleActiveResultSets=true");
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            optionsBuilder.UseSqlServer(connectionString);
         }
         protected override void OnModelCreating(ModelBuilder builder)
         {
